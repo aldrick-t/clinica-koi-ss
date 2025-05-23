@@ -20,7 +20,7 @@ PubSubClient client(espClient);
 
 void setup_wifi() {
   delay(10);
-  Serial.println("Conectando a WiFi...");
+  Serial.println("Conectando a WiFi...");q
   WiFi.begin(ssid, password);
 
   while (WiFi.status() != WL_CONNECTED) {

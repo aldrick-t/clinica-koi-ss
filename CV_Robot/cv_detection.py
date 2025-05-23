@@ -21,11 +21,11 @@ alto_frame = 0
 
 # Definición de zonas (se actualizarán)
 zonas = {
-    "detener": None,
-    "avanzar": None,
-    "retroceder": None,
-    "izquierda": None,
-    "derecha": None
+    "stop": None,
+    "forward": None,
+    "backward": None,
+    "left": None,
+    "right": None
 }
 
 def dibujar_zonas(frame):
@@ -36,8 +36,8 @@ def dibujar_zonas(frame):
             color = (0, 255, 0)  # Verde para la mayoría
             grosor = 2
             
-            if nombre_zona == "detener":
-                color = (0, 0, 255)  # Rojo para detener
+            if nombre_zona == "stop":
+                color = (0, 0, 255)  # Rojo para stop
                 grosor = 3
             
             # Dibujar rectángulo de zona
@@ -60,33 +60,35 @@ def inicializar_zonas():
     global zonas
     
     margen = 20
-    ancho_zona = int(ancho_frame * 0.4)
-    alto_zona = int(alto_frame * 0.4)
+    ancho_zona = int(ancho_frame * 0.2)
+    alto_zona = int(alto_frame * 0.3)
     
     # Disposición cuadricular de 3x2
-    zonas["avanzar"] = [  # Arriba izquierda
-        (margen, margen),
-        (margen + ancho_zona, margen + alto_zona)
-    ]
-    
-    zonas["detener"] = [  # Arriba centro
+    zonas["forward"] = [  # Arriba left
         (int(ancho_frame/2 - ancho_zona/2), margen),
         (int(ancho_frame/2 + ancho_zona/2), margen + alto_zona)
     ]
     
-    zonas["retroceder"] = [  # Arriba derecha
-        (ancho_frame - margen - ancho_zona, margen),
-        (ancho_frame - margen, margen + alto_zona)
+    zonas["stop"] = [  # Centro centro
+        (int(ancho_frame/2 - ancho_zona/2), int(alto_frame/2 - (alto_zona*.95)/2)),
+        (int(ancho_frame/2 + ancho_zona/2), int(alto_frame/2 + (alto_zona*.95)/2))
+    ]
+ 
+    
+    zonas["backward"] = [  # Abajo centro
+        (int(ancho_frame/2 - ancho_zona/2), alto_frame - margen - alto_zona),
+        (int(ancho_frame/2 + ancho_zona/2), alto_frame - margen)
+    ]
+
+        
+    zonas["left"] = [  # Centro left
+        (margen, int(alto_frame/2 - (alto_zona*.95)/2)),
+        (margen + ancho_zona, int(alto_frame/2 + (alto_zona*.95)/2))
     ]
     
-    zonas["izquierda"] = [  # Abajo izquierda
-        (margen, alto_frame - margen - alto_zona),
-        (margen + ancho_zona, alto_frame - margen)
-    ]
-    
-    zonas["derecha"] = [  # Abajo derecha
-        (ancho_frame - margen - ancho_zona, alto_frame - margen - alto_zona),
-        (ancho_frame - margen, alto_frame - margen)
+    zonas["right"] = [  # Abajo right
+        (ancho_frame - margen - ancho_zona, int(alto_frame/2 - (alto_zona*.95)/2)),
+        (ancho_frame - margen, int(alto_frame/2 + (alto_zona*.95)/2))
     ]
 
 def mano_en_zona(pos_mano, zona):
@@ -118,15 +120,19 @@ def detectar_gesto(landmarks):
 # Bucle principal
 cap = cv2.VideoCapture(0)
 ultimo_comando = ""
-
+cv2.namedWindow("Control por Gestos", cv2.WINDOW_NORMAL)
+cv2.resizeWindow("Control por Gestos", 1280, 960)  # Ancho, Alto
 while cap.isOpened():
     exito, frame = cap.read()
     if not exito:
         break
-    
+    frame = cv2.resize(frame, (1280,960))  # Antes de procesarlo
+    # espejear imagen
+    frame = cv2.flip(frame, 1)  # Espejear horizontalmente
     # Actualizar tamaño del frame
     alto_frame, ancho_frame = frame.shape[:2]
-    if zonas["detener"] is None:
+    if zonas["stop"] is None or zonas["stop"][1][0] > ancho_frame:
+        zonas = {k: None for k in zonas}  # Reiniciar zonas si el tamaño cambió
         inicializar_zonas()
 
     # Procesamiento de pose
@@ -144,17 +150,21 @@ while cap.isOpened():
         # Mostrar comando actual
         cv2.putText(frame, f'Comando: {gesto.upper()}', (30, 60), 
                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 2)
+        if gesto == "inactivo":
+            gesto = "stop"
 
         # Enviar comando si cambió
-        if gesto != ultimo_comando and gesto not in ["inactivo", "sin_persona"]:
+        if gesto != ultimo_comando:
             client.publish(TOPIC, gesto)
             print(f"Comando enviado: {gesto}")
             ultimo_comando = gesto
+        
 
     # Mostrar frame
     cv2.imshow("Control por Gestos", frame)
     if cv2.waitKey(10) & 0xFF == ord('q'):
         break
+
 
 # Liberar recursos
 cap.release()
